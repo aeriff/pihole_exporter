@@ -17,29 +17,29 @@
 
 package pihole
 
-type DomainsOverTime struct {
-	Stats map[string]string
-}
-
-type AdsOverTime struct {
-	Stats map[string]string
-}
-
-// Metrics define PiHome Prometheus metrics
+// Metrics define PiHole Prometheus metrics
 type Metrics struct {
-	DomainsBeingBlocked float64            `json:"domains_being_blocked"`
-	DNSQueriesToday     float64            `json:"dns_queries_today"`
-	AdsBlockedToday     float64            `json:"ads_blocked_today"`
-	AdsPercentageToday  float64            `json:"ads_percentage_today"`
-	DomainsOverTime     DomainsOverTime    `json:"domains_over_time"`
-	AdsOverTime         AdsOverTime        `json:"ads_over_time"`
+	DomainsBeingBlocked float64 `json:"domains_being_blocked"`
+	DNSQueriesToday     float64 `json:"dns_queries_today"`
+	AdsBlockedToday     float64 `json:"ads_blocked_today"`
+	AdsPercentageToday  float64 `json:"ads_percentage_today"`
+	UniqueDomains       float64 `json:"unique_domains"`
+	QueriesForwarded    float64 `json:"queries_forwarded"`
+	QueriesCached       float64 `json:"queries_cached"`
+	ClientsEverSeen     float64 `json:"clients_ever_seen"`
+	UniqueClients       float64 `json:"unique_clients"`
+	DNSQueriesAllTypes  float64 `json:"dns_queries_all_types"`
+	ReplyNODATA         float64 `json:"reply_NODATA"`
+	ReplyNXDOMAIN       float64 `json:"reply_NXDOMAIN"`
+	ReplyCNAME          float64 `json:"reply_CNAME"`
+	ReplyIP             float64 `json:"reply_IP"`
+	Status              string  `json:"status"`
+	GravityLastUpdated  struct {
+		Absolute float64 `json:"absolute"`
+	} `json:"gravity_last_updated"`
 	TopQueries          map[string]float64 `json:"top_queries"`
 	TopAds              map[string]float64 `json:"top_ads"`
 	TopSources          map[string]float64 `json:"top_sources"`
-	QueryA              float64            `json:"query[A]"`
-	QueryAAAA           float64            `json:"query[AAAA]"`
-	QueryPTR            float64            `json:"query[PTR]"`
-	QuerySOA            float64            `json:"query[SOA]"`
-	Eight844            float64            `json:"8.8.4.4"`
-	Eight888            float64            `json:"8.8.8.8"`
+	ForwardDestinations map[string]float64 `json:"forward_destinations"`
+	Querytypes          map[string]float64 `json:"querytypes"`
 }

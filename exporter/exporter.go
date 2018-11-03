@@ -15,10 +15,12 @@
 package exporter
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
+	"strings"
 
 	"github.com/nlamirault/pihole_exporter/pihole"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 )
 
 const (
@@ -41,31 +43,16 @@ var (
 		"Ads blocked today.",
 		nil, nil,
 	)
-
 	adsPercentage = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "", "ads_percentage_today"),
 		"Ads percentage today.",
 		nil, nil,
 	)
-
-	domainsOverTime = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "domains_over_time"),
-		"Domains over time.",
-		nil, nil,
-	)
-
-	adsOverTime = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "", "ads_over_time"),
-		"Ads over time.",
-		nil, nil,
-	)
-
 	topQueries = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "", "top_queries"),
 		"Top queries.",
 		[]string{"domain"}, nil,
 	)
-
 	topAds = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "", "top_ads"),
 		"Top Ads.",
@@ -81,6 +68,21 @@ var (
 		"DNS Query types.",
 		[]string{"type"}, nil,
 	)
+	forwardDestinations = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "", "forward_destinations"),
+		"DNS Query forward destinations.",
+		[]string{"target"}, nil,
+	)
+	lastUpdated = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "", "gravity_last_updated"),
+		"Timestamp of last Gravity update.",
+		nil, nil,
+	)
+	enabled = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "", "enabled"),
+		"Whether Pi-hole is enabled or not.",
+		nil, nil,
+	)
 )
 
 // Exporter collects Pihole stats from the given server and exports them using
@@ -91,7 +93,6 @@ type Exporter struct {
 
 // NewExporter returns an initialized Exporter.
 func NewExporter(endpoint string) (*Exporter, error) {
-	log.Infoln("Setup Pihole exporter using URL: %s", endpoint)
 	pihole, err := pihole.NewClient(endpoint)
 	if err != nil {
 		return nil, err
@@ -108,32 +109,40 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- dnsQueries
 	ch <- adsBlocked
 	ch <- adsPercentage
-	ch <- domainsOverTime
-	ch <- adsOverTime
 	ch <- topQueries
 	ch <- topAds
 	ch <- topSources
 	ch <- queryTypes
+	ch <- forwardDestinations
+	ch <- lastUpdated
+	ch <- enabled
 }
 
 // Collect the stats from channel and delivers them as Prometheus metrics.
 // It implements prometheus.Collector.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	log.Infof("Pihole exporter starting")
 	resp, err := e.Pihole.GetMetrics()
 	if err != nil {
-		log.Errorf("Pihole error: %s", err.Error())
+		log.Errorf("Error collecting metrics: %s", err.Error())
 		return
 	}
-	log.Infof("PiHole metrics: %#v", resp)
+
+	switch resp.Status {
+	case "enabled":
+		storeMetric(ch, 1, enabled)
+	default:
+		storeMetric(ch, 0, enabled)
+	}
+
 	storeMetric(ch, resp.DomainsBeingBlocked, domainsBeingBlocked)
 	storeMetric(ch, resp.DNSQueriesToday, dnsQueries)
 	storeMetric(ch, resp.AdsBlockedToday, adsBlocked)
 	storeMetric(ch, resp.AdsPercentageToday, adsPercentage)
-	storeMetric(ch, resp.QueryA, queryTypes, "A")
-	storeMetric(ch, resp.QueryAAAA, queryTypes, "AAAA")
-	storeMetric(ch, resp.QueryPTR, queryTypes, "PTR")
-	storeMetric(ch, resp.QuerySOA, queryTypes, "SOA")
+	storeMetric(ch, resp.GravityLastUpdated.Absolute, lastUpdated)
+
+	for qtype, requests := range resp.Querytypes {
+		storeMetric(ch, requests, queryTypes, strings.Fields(qtype)[0])
+	}
 	for domain, hits := range resp.TopQueries {
 		storeMetric(ch, hits, topQueries, domain)
 	}
@@ -143,8 +152,10 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	for client, requests := range resp.TopSources {
 		storeMetric(ch, requests, topSources, client)
 	}
-
-	log.Infof("Pihole exporter finished")
+	for target, requests := range resp.ForwardDestinations {
+		d := strings.Split(target, "|")
+		storeMetric(ch, requests, forwardDestinations, d[len(d)-1])
+	}
 }
 
 func storeMetric(ch chan<- prometheus.Metric, value float64, desc *prometheus.Desc, labels ...string) {

@@ -15,65 +15,55 @@
 package pihole
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/prometheus/common/log"
-	"io/ioutil"
 	"net/http"
 	"net/url"
-
-	"github.com/nlamirault/pihole_exporter/version"
-)
-
-const (
-	acceptHeader = "application/json"
-	mediaType    = "application/json"
-)
-
-var (
-	userAgent = fmt.Sprintf("pihole-exporter/%s", version.Version)
 )
 
 type Client struct {
 	Endpoint string
-	// Username string
-	// Password string
 }
 
 func NewClient(endpoint string) (*Client, error) {
 	url, err := url.Parse(endpoint)
 	if err != nil || url.Scheme != "http" {
-		return nil, fmt.Errorf("Invalid PiHole address: %s", err)
+		return nil, fmt.Errorf("Invalid Pi-hole address: %s", err)
 	}
-	log.Debugf("PiHole client creation")
+
+	resp, err := http.Get(fmt.Sprintf("%s/admin/api.php?version", url.String()))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to check FTL version: %s", err)
+	}
+
+	var ftl struct {
+		Version int `json:"version"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&ftl); err != nil {
+		return nil, err
+	}
+
+	if ftl.Version != 3 {
+		return nil, fmt.Errorf("Unsupported FTL API version %d", ftl.Version)
+	}
+
 	return &Client{
 		Endpoint: url.String(),
-		// Username: username,
-		// Password: password,
 	}, nil
 }
 
-func (c *Client) setupHeaders(request *http.Request) {
-	request.Header.Add("Content-Type", mediaType)
-	request.Header.Add("Accept", acceptHeader)
-	request.Header.Add("User-Agent", userAgent)
-	// request.SetBasicAuth(c.Username, c.Password)
-}
-
-func (client *Client) GetMetrics() (*Metrics, error) {
-	log.Infof("Get metrics")
-	resp, err := http.Get(fmt.Sprintf("%s/admin/api.php?summaryRaw&overTimeData&topItems&recentItems&getQueryTypes&getForwardDestinations&getQuerySources&jsonForceObject", client.Endpoint))
+func (c *Client) GetMetrics() (*Metrics, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/admin/api.php?summaryRaw&topItems=20&getQueryTypes&getForwardDestinations&topClients&jsonForceObject", c.Endpoint))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	log.Debugf("Metrics response: %s", body)
+
 	var metrics Metrics
-	dec := json.NewDecoder(bytes.NewBuffer(body))
-	if err := dec.Decode(&metrics); err != nil {
-		return nil, err
+	if err := json.NewDecoder(resp.Body).Decode(&metrics); err != nil {
+		return nil, fmt.Errorf("Failed to decode FTL response: %s", err)
 	}
+
 	return &metrics, nil
 }
