@@ -17,7 +17,7 @@ package exporter
 import (
 	"strings"
 
-	"github.com/nlamirault/pihole_exporter/pihole"
+	"github.com/aeriff/pihole_exporter/pihole"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"

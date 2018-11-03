@@ -23,8 +23,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 
-	"github.com/nlamirault/pihole_exporter/exporter"
-	"github.com/nlamirault/pihole_exporter/version"
+	"github.com/aeriff/pihole_exporter/exporter"
+	"github.com/aeriff/pihole_exporter/version"
 )
 
 const (
